@@ -1,0 +1,9 @@
+:root {
+  --theme-foreground-focus: #4f46a3;
+}
+
+/*
+#observablehq-header {background-color:#ccc}
+*/
+#observablehq-header img { margin-top: -6px; }
+#observablehq-header a.mainlink {display:contents;color:#2B3B4E}
