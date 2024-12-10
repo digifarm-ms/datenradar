@@ -23,6 +23,10 @@ const dashboards = await FileAttachment("data/index-observable-notebooks.json").
 
 ```
 
+```js
+const imageUrl = FileAttachment("assets/logo/computerscreen.svg").href;
+```
+
 
 
 ```html
@@ -30,7 +34,7 @@ const dashboards = await FileAttachment("data/index-observable-notebooks.json").
 <div class="topborder grid grid-cols-2">
     ${dashboards.map(item => html`<a class="listcard card" href="${item.file}">
     <div class="fl1">
-        <img class="listimg" src="_file/assets/logo/computerscreen.svg" height="100">
+        <img class="listimg" src="${imageUrl}" height="100">
         <div class="fl2">
             <h1>${item.title}</h1>
             ${item.desc}
