@@ -1,4 +1,5 @@
 .DS_Store
 /dist/
+/src/assets/**/*.svg
 node_modules/
 yarn-error.log
