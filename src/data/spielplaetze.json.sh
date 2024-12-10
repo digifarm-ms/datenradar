@@ -1,0 +1,1 @@
+curl -f https://opendata.stadt-muenster.de/sites/default/files/spielplaetze_muenster_2024_10_checked-polygon.geojson
