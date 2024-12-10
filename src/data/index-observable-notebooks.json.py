@@ -27,22 +27,24 @@ def extract_title_from_markdown(filepath):
 
     return title, desc
 
-# Pfad zum übergeordneten Verzeichnis
+# Pfad zum Verzeichnis mit den Markdown Dateien erzeugen
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), "src"))
+if os.getcwd().endswith("data"):
+    # Wenn man's manuell im data verzeichnis aufruf, dann soll's auch gehen
+    parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 
-# Liste aller Markdown-Dateien im übergeordneten Verzeichnis
+# Liste aller Markdown-Dateien erzeugen
 markdown_files = [
     os.path.join(parent_dir, f) for f in os.listdir(parent_dir) if f.endswith('.md')
 ]
 
-# Ergebnisse speichern
-titles = []
 
-# Markdown-Dateien einlesen und Titel extrahieren
+# Markdown-Dateien einlesen und Infos extrahieren
+titles = []
 for md_file in markdown_files:
     title, desc = extract_title_from_markdown(md_file)
     if title:
         titles.append({"file": os.path.basename(md_file).replace(".md", ".html"), "title": title, "desc": desc})
 
-# Ergebnisse ausgeben
+
 print(json.dumps(titles))
