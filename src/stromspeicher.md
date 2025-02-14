@@ -45,6 +45,7 @@ const userNatuerlichepersonInput = Inputs.radio(
 const userNatuerlicheperson = Generators.input(userNatuerlichepersonInput);
 ```
 
+
 ```js
 // Extract Earliest and Latest Date from CSV File
 const dateColumn = rawInputData.map(function(d) { return d.EinheitRegistrierungsdatum });
@@ -72,8 +73,21 @@ const batterieMapping = {
 function getBatterieTech(x) {
   return batterieMapping[x] ? batterieMapping[x] : x;
 }
+
+function set(input, value) {
+  input.value = value;
+  input.dispatchEvent(new Event("input", {bubbles: true}));
+}
 ```
 
+```js
+const yearbuttons = Inputs.button([
+  ["2022", () => {set(nthDayInput, '2022-01-01');set(endDayInput,  '2022-12-31');}],
+  ["2023", () => {set(nthDayInput, '2023-01-01');set(endDayInput,  '2023-12-31');}],
+  ["2024", () => {set(nthDayInput, '2024-01-01');set(endDayInput,  '2024-12-31');}],
+  ["2025", () => {set(nthDayInput, '2025-01-01');set(endDayInput,  '2025-12-31');}],
+])
+```
 
 
 ```js
@@ -117,7 +131,9 @@ const anlagenListeGefiltert = rawInputData.filter(function(i) {
 <div class="card">
 ${userAuswertungstypInput}
 ${userNatuerlichepersonInput}
-${nthDayInput} ${endDayInput}
+<div style="width:40%;float:right">${yearbuttons}</div> 
+${nthDayInput}
+${endDayInput}
 </div>
 </div>
 
@@ -140,7 +156,11 @@ function myDonut(data, name, cols) {
     if (name == 'Batterietechnologie') {
       data = data.map(function (d) { d.name = getBatterieTech(d.name); return d;});
     }
-    const ress= data.map((d) => ([d.name + ' ('+Math.floor(d.value)+')']));
+    const ress= data.map(function (d) {
+        var einheit ="";
+        if (userAuswertungstyp=="NutzbareSpeicherkapazitaet") einheit = " kWh";
+        else if (userAuswertungstyp=="Bruttoleistung") einheit = " kW";
+        return [d.name + ' ('+Math.floor(d.value)+einheit+')']});
     return html`
     ${resize(width => DonutChart(data, {centerText: name, width, colorDomain: cols, colorRange: cols}))}
     ${Swatches(d3.scaleOrdinal(ress, cols))}
@@ -148,20 +168,28 @@ function myDonut(data, name, cols) {
 }
 ```
 
-<div class="grid card" style="height: 350px;overflow:hidden">
-    ${resize((width, height) => arrivalLineChart(width, height))}
+<div class="card" style="height: 350px;overflow:hidden">
+${userColorcodeInput}
+${resize((width, height) => arrivalLineChart(width, height))}
 </div>
 
+```js
+const userColorcodeInput = Inputs.select( new Map([
+      ["Betriebsstatus", 'BetriebsStatusName'],
+      ["AnlagenbetreiberPersonenArt", 'AnlagenbetreiberPersonenArt'],
+      ["Stromspeichertechnologie", 'StromspeichertechnologieBezeichnung'],
+      ["Spannungsebene", 'SpannungsebenenNamen'],
+      ["Batterietechnologie", 'Batterietechnologie'],
+      ["Plz", 'Plz']
+    ]), {value: "Betriebsstatus", label: "Farbcodierung"});
+const userColorcode = Generators.input(userColorcodeInput);
+```
 
 ```js
-// Line chart (arrival dates)
-let mem;
-function firstOrRecent(values) {
-  return values.length ? (mem = values[0]) : mem;
-}
+// Line chart (installation dates)
 function arrivalLineChart(width, height) {
   return Plot.plot({
-    height: height - 50,
+    height: height - 100,
     marginBottom: 35,
     width,
     x: {label: "Reg.-Datum"},
@@ -169,10 +197,10 @@ function arrivalLineChart(width, height) {
        ? {label: userAuswertungstyp, grid: true}
        : {label: userAuswertungstyp, grid: true, type: "log", base: 2, domain: [1e0, 1e4], ticks: 20}),
 //    color: {domain: seasonDomain, range: seasonColors, label: "Season"},
-    title: `Neu registrierte ${userAuswertungstyp} nach Datum`,
+   
     subtitle: ((userAuswertungstyp == "Anzahl")
-       ? `Darstellung als gleitender Mittelwert (Linie) sowie Anzahl pro Tag (Balken)`
-       : `Darstellung einzelner Anlagen (als Punkte) sowie gleitender Mittelwert`),
+       ? `Darstellung als Anzahl pro Tag (Balken) sowie gleitender Mittelwert (Linie)`
+       : `Darstellung einzelner Anlagen (Punkte) sowie gleitender Mittelwert (Linie) `),
     marks: [
       () => htl.svg`<defs>
       <linearGradient id="gradient" gradientTransform="rotate(90)">
@@ -185,20 +213,30 @@ function arrivalLineChart(width, height) {
           {y: userAuswertungstyp, 
             x: "EinheitRegistrierungsdatum",
             r: 2,
-            stroke: "#555",
+            stroke: {value: userColorcode},
             channels: {
                 AnlagenbetreiberName: {
                     value: "AnlagenbetreiberName",
                     label: ""
                 },
-                Plz: "Plz"
+                Plz: "Plz",
+                BetriebsStatusName:  {
+                    value: "BetriebsStatusName",
+                    label: "Betriebsstatus"
+                },
+                NutzbareSpeicherkapazitaet:  {
+                    value: "NutzbareSpeicherkapazitaet",
+                    label: "Speicherkapazität"
+                },
             },
             tip: {
                 format: {
                     EinheitRegistrierungsdatum: true,
                     x: "%d. %b %Y",
                     AnlagenbetreiberName: true,
+                    BetriebsStatusName: true,
                     Plz: d => d.toString(), 
+                    NutzbareSpeicherkapazitaet: d => d.toString() + " kWh", 
                 }
             }
           }
@@ -244,6 +282,7 @@ function arrivalLineChart(width, height) {
 }
 ```
 
+## Kategorien
 
 <div class="grid grid-cols-4">
   <div class="card ">${myDonut(calcDonutSum('Plz'), "Plz", d3.schemePaired)}</div>
@@ -259,6 +298,8 @@ function arrivalLineChart(width, height) {
 
 
 
+
+## Datentabelle
 
 ```js
 // Visuelle Darstellung in der Tabellenspalte "Leistung"
@@ -339,5 +380,15 @@ const tableSearchValue = view(tableSearch);
 
 
 <div class="small">Aktuell ausgewählter Datumsfilter:
-${appStartDay.toLocaleDateString("de-DE")} - ${appEndDay.toLocaleDateString("de-DE")}  (${d3.timeDay.count(appStartDay, appEndDay)} Tage)
+${appStartDay.toLocaleDateString("de-DE")} - ${appEndDay.toLocaleDateString("de-DE")}  (${d3.timeDay.count(appStartDay, appEndDay)} Tage)</div>
+<br><br><br><br>
+<div class="card">
+<table style="opacity:0.8">
+<tr><th colspan="2">Information zu den dargestellten Daten</th></tr>
+<tr><td>Datenstand:</td><td>${endDate.toLocaleDateString("de-DE")}</td></tr>
+<tr><td>Datenquelle:</td><td><a href="https://www.marktstammdatenregister.de/MaStR/Einheit/Einheiten/OeffentlicheEinheitenuebersicht">Marktstammdatenregister</a></td></tr>
+<tr><td>Lizenz:</td><td><a href="https://www.govdata.de/dl-de/by-2-0">Datenlizenz Deutschland – Namensnennung – Version 2.0</a></td></tr>
+<tr><td>Datendownload:</td><td><a href="https://opendata.stadt-muenster.de/search?query=marktstammdaten">Marktstammdatenregister Datensätze auf dem Open Data Portal Münster</a></td></tr>
+</table>
+
 </div>
