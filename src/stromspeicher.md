@@ -1,6 +1,6 @@
 ---
 toc: false
-title: Stromspeicher (vis.)
+title: Stromspeicher
 theme: [wide]
 ---
 
@@ -11,35 +11,56 @@ import {DonutChart} from "./components/donutChart.js";
 import {Swatches} from "./components/swatches.js";
 // import {bigNumber} from "./components/bigNumber.js";
 
-const hotelData = FileAttachment("data/marktstammdatenregister-speicher.csv").csv({typed: true});
+const rawInputData = FileAttachment("data/marktstammdatenregister-speicher.csv").csv({typed: true});
 ```
 
 ```js
-// Radio button input to choose 
-const pickMarketSegmentInput = Inputs.radio(
-  ["NutzbareSpeicherkapazitaet", "Bruttoleistung", "Anzahl"],
+// Define Radio Button Input "Auswertungstyp" 
+const userAuswertungstypInput = Inputs.radio(
+    new Map([
+      ['Nutzbare Speicherkapaz. (kWh)', "NutzbareSpeicherkapazitaet",],
+      ['Bruttoleistung (kW)', "Bruttoleistung"],
+      ['Anzahl Anlagen', "Anzahl"]
+    ]),
   {
     label: "Auswertungstyp:",
     value: "NutzbareSpeicherkapazitaet",
     unique: true
   }
 );
-const pickMarketSegment = Generators.input(pickMarketSegmentInput);
-```
-
-
-
-
-```js
-const natPers = Inputs.radio(['Ja', 'Nein', 'egal'], {label: 'Natürliche Persone', value: 'egal'})
-const natPersValue = Generators.input(natPers)
+const userAuswertungstyp = Generators.input(userAuswertungstypInput);
 ```
 
 ```js
-const dateColumn = hotelData.map(function(d) { return d.EinheitRegistrierungsdatum });
+// Define Radio Button Input "Natürliche Person" 
+const userNatuerlichepersonInput = Inputs.radio(
+    new Map([
+      ["Nur natürliche Personen anzeigen", 'Ja'],
+      ["Nur Unternehmen", 'Nein'],
+      ["Beides anzeigen", 'egal']
+    ]),
+    {label: 'Einschränkung:', 
+    value: 'egal'}
+);
+const userNatuerlicheperson = Generators.input(userNatuerlichepersonInput);
+```
+
+```js
+// Extract Earliest and Latest Date from CSV File
+const dateColumn = rawInputData.map(function(d) { return d.EinheitRegistrierungsdatum });
 const beginDate = dateColumn.sort(d3.ascending)[0];
 const endDate = dateColumn.sort(d3.descending)[0];
 
+
+// Define Date Inputs
+const nthDayInput = Inputs.date({label: "Startdatum:", value: beginDate});
+const endDayInput = Inputs.date({label: "Enddatum:", value: endDate});
+const appStartDay = Generators.input(nthDayInput);
+const appEndDay = Generators.input(endDayInput);
+```
+
+```js
+// Batterie Typ Mapping & helper function
 const batterieMapping = {
   	727: 'Lithium-Batterie',
     728: 'Blei-Batterie',
@@ -51,42 +72,69 @@ const batterieMapping = {
 function getBatterieTech(x) {
   return batterieMapping[x] ? batterieMapping[x] : x;
 }
-
-
-const nthDayInput = Inputs.date({label: "Startdatum", value: beginDate});
-const endDayInput = Inputs.date({label: "Enddatum", value: endDate});
-const appStartDay = Generators.input(nthDayInput);
-const appEndDay = Generators.input(endDayInput);
 ```
+
+
 
 ```js
-const duration = function() {
-   d3.timeDay.count(appStartDay, appEndDay);
-};
+// Filtere die Daten entsprechend der User Filter Auswahl
+// und stelle sie reactive für alle anderen Widgets zur Verfügung
+// (reactiveness geht wohl automatisch wenn diese Methode in einem eigenen JS Block ist..?)
+const anlagenListeGefiltert = rawInputData.filter(function(i) {
+    if (i.EinheitRegistrierungsdatum < appStartDay) { return false;   }
+    if (i.EinheitRegistrierungsdatum > appEndDay) { return false;   }
+
+    if (userNatuerlicheperson=="egal") {
+      return true
+    }  else if (i.AnlagenbetreiberPersonenArt==518 && userNatuerlicheperson == 'Ja') {
+      return true;
+    }  else if (i.AnlagenbetreiberPersonenArt!=518 && userNatuerlicheperson == 'Nein') {
+      return true;
+    }
+    return false;
+}
+);
 ```
 
+<style type="text/css">
+@media (min-width: calc(640px + 6rem + 272px)) {
+    .stickyTop {
+        background-color: var(--theme-background);
+        position: sticky;
+        top: 50px;
+        z-index: 2000;
+        border-bottom: 5px solid var(--theme-background);
+    }
+    .stickyTop .card { 
+        margin: 0;
+        border: solid 1px var(--theme-foreground);
+    }
+}
+</style>
+
+<!-- Show user inputs -->
+<div class="stickyTop">
 <div class="card">
-
-${pickMarketSegmentInput}
-${natPers}
+${userAuswertungstypInput}
+${userNatuerlichepersonInput}
 ${nthDayInput} ${endDayInput}
-
+</div>
 </div>
 
-
-## Stromspeicher nach ${pickMarketSegment}
+## Stromspeicher nach ${userAuswertungstyp}
 
 ```js
+// Hilfsfunktionen für die Pie Charts
 
-// Anleitung für d3.rollups: https://observablehq.com/@d3/d3-group
 function calcDonutSum(field) {
+    // Berechnung der Prozentualen Anteile in den Pie Charts bzw Donuts
+    // Anleitung für d3.rollups: https://observablehq.com/@d3/d3-group
     return d3.rollups(
-        bookingsByMarketSegment, 
-        v => (pickMarketSegment == "Anzahl")? v.length : d3.sum(v, d => d[pickMarketSegment]), 
+        anlagenListeGefiltert, 
+        v => (userAuswertungstyp == "Anzahl")? v.length : d3.sum(v, d => d[userAuswertungstyp]), 
         d => d[field]
     ).map(([name, value]) => ({name, value}));
 }
-
 
 function myDonut(data, name, cols) {
     if (name == 'Batterietechnologie') {
@@ -98,42 +146,9 @@ function myDonut(data, name, cols) {
     ${Swatches(d3.scaleOrdinal(ress, cols))}
     `;
 }
-
-function sparkbar(max) { // logarithmic sparkbar
-  return (x) => htl.html`<div style="
-    background: var(--theme-green);
-    color: black;
-    font: 10px/1.6 var(--sans-serif);
-    width: ${100 * Math.log(x+1)/Math.log(max+1)}%;
-    float: right;
-    padding-right: 3px;
-    box-sizing: border-box;
-    overflow: visible;
-    display: flex;
-    justify-content: end;">${Math.floor(x).toLocaleString("de-DE")}`
-}
 ```
 
-
-```js
-// Filtered data for selected market segment
-const bookingsByMarketSegment = hotelData.filter(function(i) {
-    if (i.EinheitRegistrierungsdatum < appStartDay) { return false;   }
-    if (i.EinheitRegistrierungsdatum > appEndDay) { return false;   }
-
-    if (natPersValue=="egal") {
-      return true
-    }  else if (i.AnlagenbetreiberPersonenArt==518 && natPersValue == 'Ja') {
-      return true;
-    }  else if (i.AnlagenbetreiberPersonenArt!=518 && natPersValue == 'Nein') {
-      return true;
-    }
-}
-);
-
-```
-
-<div class="grid card" style="height: 250px;overflow:hidden">
+<div class="grid card" style="height: 350px;overflow:hidden">
     ${resize((width, height) => arrivalLineChart(width, height))}
 </div>
 
@@ -150,12 +165,14 @@ function arrivalLineChart(width, height) {
     marginBottom: 35,
     width,
     x: {label: "Reg.-Datum"},
-    y: ((pickMarketSegment == "Anzahl")
-       ? {label: pickMarketSegment, grid: true}
-       : {label: pickMarketSegment, grid: true, type: "log", base: 2, domain: [1e0, 1e4], ticks: 20}),
+    y: ((userAuswertungstyp == "Anzahl")
+       ? {label: userAuswertungstyp, grid: true}
+       : {label: userAuswertungstyp, grid: true, type: "log", base: 2, domain: [1e0, 1e4], ticks: 20}),
 //    color: {domain: seasonDomain, range: seasonColors, label: "Season"},
-    title: `Neu registrierte ${pickMarketSegment} nach Datum`,
-    subtitle: `Daily counts (gray area) and 28-day moving average (solid line).`,
+    title: `Neu registrierte ${userAuswertungstyp} nach Datum`,
+    subtitle: ((userAuswertungstyp == "Anzahl")
+       ? `Darstellung als gleitender Mittelwert (Linie) sowie Anzahl pro Tag (Balken)`
+       : `Darstellung einzelner Anlagen (als Punkte) sowie gleitender Mittelwert`),
     marks: [
       () => htl.svg`<defs>
       <linearGradient id="gradient" gradientTransform="rotate(90)">
@@ -164,11 +181,11 @@ function arrivalLineChart(width, height) {
       </linearGradient>
       </defs>`,
       Plot.dotY(
-        bookingsByMarketSegment,
-          {y: pickMarketSegment, 
+        anlagenListeGefiltert,
+          {y: userAuswertungstyp, 
             x: "EinheitRegistrierungsdatum",
-    r: 2,
-stroke: "#555",
+            r: 2,
+            stroke: "#555",
             channels: {
                 AnlagenbetreiberName: {
                     value: "AnlagenbetreiberName",
@@ -187,12 +204,12 @@ stroke: "#555",
           }
       ),
       Plot.areaY(
-        bookingsByMarketSegment,
+        anlagenListeGefiltert,
         Plot.binX(
-          {y: ((pickMarketSegment == "Anzahl")? "count" : "sum"), thresholds: "day", filter: null},
+          {y: ((userAuswertungstyp == "Anzahl")? "count" : "sum"), thresholds: "day", filter: null},
           {
             x: "EinheitRegistrierungsdatum",
-            y: pickMarketSegment,
+            y: userAuswertungstyp,
             curve: "step",
             fill: "url(#gradient)",
             tip: {
@@ -206,14 +223,14 @@ stroke: "#555",
         )
       ),
       Plot.lineY(
-        bookingsByMarketSegment,
+        anlagenListeGefiltert,
         Plot.windowY(
-          {k: 28},
+          {k: 60},
           Plot.binX(
-            {y: ((pickMarketSegment == "Anzahl")? "count" : "sum"), interval: "day", filter: null},
+            {y: ((userAuswertungstyp == "Anzahl")? "count" : "sum"), interval: "day", filter: null},
             {
               x: "EinheitRegistrierungsdatum",
-              y: pickMarketSegment,
+              y: userAuswertungstyp,
               z: null,
             }
           )
@@ -244,14 +261,32 @@ stroke: "#555",
 
 
 ```js
+// Visuelle Darstellung in der Tabellenspalte "Leistung"
+
+function sparkbar(max) { 
+   // logarithmic sparkbar
+  return (x) => htl.html`<div style="
+    background: var(--theme-green);
+    color: black;
+    font: 10px/1.6 var(--sans-serif);
+    width: ${100 * Math.log(x+1)/Math.log(max+1)}%;
+    float: right;
+    padding-right: 3px;
+    box-sizing: border-box;
+    overflow: visible;
+    display: flex;
+    justify-content: end;">${Math.floor(x).toLocaleString("de-DE")}kWh`
+}
+
 // Create search input (for searchable table)
-const tableSearch = Inputs.search(bookingsByMarketSegment);
+const tableSearch = Inputs.search(anlagenListeGefiltert);
 const tableSearchValue = view(tableSearch);
 ```
+
+
 <div class="card" style="padding: 0">
   <div style="padding: 1em">
     ${display(tableSearch)}
-    ${display(natPers)}
   </div>
   <div style="padding: 1em">
   ${display(Inputs.table(tableSearchValue, {
@@ -290,6 +325,7 @@ const tableSearchValue = view(tableSearch);
 //            Id: id => htl.html`<a href="https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/EinheitDetailDrucken/${id}" target=_blank>${id}</a>`,
             Id: id => htl.html`<a href="https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/${id}" target=_blank>${id}</a>`,
             Plz: d => d.toString(), 
+            Bruttoleistung: (d) => (d + "kW"),
             EinheitRegistrierungsdatum: d3.utcFormat("%d.%m.%Y"),
             InbetriebnahmeDatum: d3.utcFormat("%d.%m.%Y"),
             NutzbareSpeicherkapazitaet: sparkbar(d3.max(tableSearchValue, d => d.NutzbareSpeicherkapazitaet)),
@@ -302,5 +338,6 @@ const tableSearchValue = view(tableSearch);
 </div>
 
 
-Filter:
+<div class="small">Aktuell ausgewählter Datumsfilter:
 ${appStartDay.toLocaleDateString("de-DE")} - ${appEndDay.toLocaleDateString("de-DE")}  (${d3.timeDay.count(appStartDay, appEndDay)} Tage)
+</div>
